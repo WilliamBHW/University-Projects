@@ -1,0 +1,144 @@
+---
+title: "C53 project Part2-contingency table and plots -BoHan Wang"
+output:
+  pdf_document: default
+  html_notebook: default
+---
+```{r}
+library(tidyverse)
+```
+
+
+```{r}
+my_url <- "http://sda.chass.utoronto.ca/sdaweb/tmpdir/AAULeQLH.csv"
+my_data <- read_csv(my_url)
+my_data
+```
+This is the 2016 data of income which included goverment transfer, market income and total income. The 99999996 is the outlier which either they did not provide the data or they have an out balanced data. On the other hand, by the equation total income = government transfer + market income, 99999996 does not satisfy the equation.
+
+```{r}
+set.seed(1003287338)
+row_sub = apply(my_data, 1, function(row) all(row !=99999996))
+final <- my_data[row_sub,]
+final %>% sample_n(1000) -> data
+data
+```
+This function removes all the outliers that have income value of 99999996. Also, randomly sample 1000 rows of CASEID, the set seed assures that any randomsample has a boundary.
+
+```{r}
+gtrcount = 0
+mtinccount = 0
+totalcount = 0
+for (i in data$gtr){
+  if (i == 0){
+    gtrcount = gtrcount+1
+  }
+}
+for (i in data$mtinc){
+  if (i == 0){
+    mtinccount = mtinccount+1
+  }
+}
+for (i in data$ttinc){
+  if (i == 0){
+    totalcount = totalcount+1
+  }
+}
+c("gtrcount"=gtrcount, "mtinccount"=mtinccount, "totalcount"=totalcount)
+```
+This function counts all the 0s in government tranfer, marketincome and total income. This data is used to construct a contingency table for further analysis.
+
+```{r}
+table1 <- array(data = c(1000-totalcount-(gtrcount-totalcount)-(mtinccount-totalcount),
+                         gtrcount-totalcount,
+                         mtinccount-totalcount,
+                         totalcount),
+                dim = c(2,2),
+                dimnames = list(Government = c("Yes","No"), Market = c("Yes","No"))
+                )
+table1
+```
+This contengency table shows the number of cases that:
+case1: neither of government transfer or market income equal to 0; 
+case2: marketincome not equalto 0|government transfer equal to 0; 
+case3: government transfer not equal to 0|market income equal to 0; 
+case4: both government transfer and market income are 0.
+
+```{r}
+chisq.test(table1, correct = F)
+chisq.test(table1, correct = F)$expected
+```
+These functions calculates the chisquare and display the expected values of the contingency table (where expected value equal to the product of row proportion, column proportion and total sum n). In the data, the p-value is 0.006097 which is strictly less than 0.05. This indicates that there exist interaction/association between government transfer and market income. Since the sample size is 1000 which is large sample, thus the Ei(expected values of each cell) is greater than 5.
+
+```{r}
+table1 %>% mosaicplot(., main = "Association between Government and Market", shade = TRUE)
+```
+This function draws a mosaic plot of the contingency table. In this case, the table indicates that the sampled model is a good model since there's only a small portion of the table is in the range from -4 to -2.
+
+
+```{r}
+chisq.test(table1, correct = F)$residuals # standarized
+chisq.test(table1, correct = F)$stdres # agjusted standarized
+```
+These functions display the standarized residual and adjusted standarizwed residual of the contingency table. Since both data does not have a cell that has value less than -3 or greater than 3. Thus, the mosiac plot above is a good plot.
+
+```{r}
+prop.test(c(618,264),c(618+97, 264+21),correct=F)
+```
+This function calcualtes the proportion of case1 and case2 with assumption of that case1 have the same proportions in respect to case2. The p-value is 0.006097 which is strictly less than 0.05 which indicates that case1 and case2 are not equal in proportion.
+
+```{r}
+url <- "http://sda.chass.utoronto.ca/sdaweb/tmpdir/AA6zjF2F.csv"
+data <- read_csv(url)
+data
+```
+This data is also took from the 2016 economic data set.
+
+```{r}
+set.seed(1003287338)
+row_sub = apply(data, 1, function(row) all(row !=99999996))
+final <- data[row_sub,]
+final %>% sample_n(1000) -> data3
+data3
+```
+Use the same procedure from before to filter the data such that the outliers are eliminated.
+
+```{r}
+data3 %>% select(CASEID, earng, inva, othinc, prpen) %>% pivot_longer(earng:prpen, names_to = "inctype", values_to = "value") -> data4
+data4
+```
+This function convert the data such that all groups are collected as a categorical variable and all values are collected as quantitative variable.
+
+We would like to compare means between each group, however t-test only compare 2 groups. If we do multiple t-test to compare between each 2 groups, that would violate the meaning of level of significance. Thus there's a method to adjust all the comparisons of the mean of each groups (which is named Tukey). Tukey compares all several groups at once and tells you which group is differ from which.
+
+```{r}
+data4 %>% ggplot(aes(x=inctype, y=value)) + geom_boxplot()
+```
+
+The assumption of this test is that the data is normally distributed with equal spread. The data in boxplot does not support the assumption of equal spread in this case. There's another Tukey's equivalent is named Games-Howell which the assumptions are that the data is normally distributed with not equal spread.
+
+```{r}
+library(devtools)
+install_github("nxskok/smmr")
+library(PMCMRplus)
+```
+These packages' copyright belongs to Ken Butler. The package contains the Tukey's test and many more tests that are useful.
+
+```{r}
+gamesHowellTest(value~factor(inctype), data=data4)
+```
+This test gives the follow conditions based on p-values:
+- earning differ from investment income
+- earning differ from other income
+- earning differ from private pension plan
+- investment income differ from other income
+- other income differ from private pension plan
+
+```{r}
+data3 %>% summary()
+```
+We only look at the summary of earning to pensionplan. From the test above, this is sufficient to show the differences. earning > pension plan > investment income > other income (in terms of mean)
+
+
+
+
