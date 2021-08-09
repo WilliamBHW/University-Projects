@@ -1,0 +1,193 @@
+---
+title: "STAC33 Final Exam - Bo Han Wang"
+output: html_notebook
+---
+
+
+```{r}
+library(tidyverse)
+library(broom)
+```
+
+## 1.
+# a)
+```{r}
+my_url <- "http://ritsokiguess.site/STAC33/winecellar.csv"
+wined <- read_csv(my_url)
+wined
+```
+
+# b)
+```{r}
+wined %>% select(product_name)
+```
+
+# c)
+```{r}
+wined %>% filter(country_region == "LOIRE")
+```
+
+# d)
+```{r}
+wined %>% group_by(vintage) %>% summarize(wine_number = n())
+```
+
+# e)
+```{r}
+wined %>%  
+  group_by(vintage) %>%
+  summarize(sub_consumpion = sum(consumption)) -> wined2
+wined2
+```
+
+# f)
+```{r}
+wined2 %>% arrange(desc(sub_consumpion))
+```
+As shown from the data, 2014/15 vintage has 1637 wine consummed.
+
+# g)
+```{r}
+wined %>% filter(country_region == "AUSTRALIA") %>% 
+  group_by(country_region) %>% 
+  summarize(total = sum(consumption))
+```
+In total, there are 25 bottles of wine from Australia were consumped.
+
+
+## 2.
+# a)
+```{r}
+my_url <- "http://ritsokiguess.site/STAC33/bank.csv"
+bank <- read_csv(my_url)
+bank
+```
+
+# b)
+The data is not tidy since all the time periods (i.e. morning, afternoon, evening) are within one day but being put into multiple columns.These column names make the data hard to be specified. It is hard to make plots and tests.
+
+# c)
+```{r}
+bank2 <- bank %>% 
+  pivot_longer(morning_phone:evening_teller, names_to = "contact_time", values_to = "satisfication") %>% 
+  separate(contact_time, c("time", "contact"), "_")
+bank2
+```
+
+# d)
+```{r}
+bank2 %>% ggplot(aes(x = contact, y = satisfication)) + 
+  geom_boxplot() + 
+  facet_wrap(~fct_inorder(time), scale = "free")
+```
+
+# e)
+From the graph, it is obvious that the median of teller is graeter than the median of phone in each group. Thus customers are preferred to be contact by teller.Evening seems to be the best of 3 times since the teller boxplot with highest median and no whiskers.
+
+# f)
+```{r}
+my_url = "http://ritsokiguess.site/STAC33/bank_original.csv"
+newbank <- read_csv(my_url)
+newbank
+```
+
+# g)
+```{r}
+newbank %>% 
+  pivot_longer(phone:teller, names_to = "contact", values_to = "satisfication") %>% 
+  separate(satisfication, c("1", "2", "3", "4"), ":") %>% 
+  pivot_longer("1":"4", names_to = "within", values_to = "satisfication") %>% 
+  select(within, time = timeofday, contact, satisfication) %>% 
+  arrange(within)
+```
+
+## 3.
+# a)
+```{r}
+my_url = "http://ritsokiguess.site/STAC33/allgreen.txt"
+business <- read_delim(my_url, " ")
+business
+```
+
+# b)
+```{r}
+business.1 <- lm(sales~display + inventory + advertising + sales_size + competing, data = business)
+summary(business.1)
+```
+
+# c)
+Based on the summary of b), it is clear that all the variables have p-values stricly less than 0.05. Thus all variables are significantly different from 0, which then cannot be eliminated. Besides, adjusted R-square is about 99% which indicate that the model is being fitted well. There's no need to modify the model.
+
+# d)
+Competing shows a negative slope is reasonable.As competing increase by a unit, intercept drop by 5.54914 units. If a store have good display; inventory; advertiseing and sales_size, it is possible for them to be at a disadvantage on competing with other stores (maybe the sotre just opened for business).
+
+# e)
+```{r}
+business.1 %>% ggplot(aes(x = .fitted, y = .resid)) + geom_point()
+```
+
+# f)
+The plot seems randomly scattered, no pattern could be observed then this indicate that the fitted model is a good assumption.
+
+# g)
+```{r}
+business.1 %>% augment(business) -> business2
+business2 %>% 
+  pivot_longer(display:competing, names_to = "xname", values_to = "x") %>% 
+  ggplot(aes(x = x, y = .resid)) + geom_point() + facet_wrap(~fct_inorder(xname), scale = "free")
+```
+
+# h)
+Based on the plots of g), there seems no pattern on any residual against each variable's value. Thus the plot is completely random and the model is fitted well. However the graph e) is really similar to residual vs sales_size in g). Thus it is indicating that sales_size is having a relatively larger correlation when comparing to other variables.
+
+## 4.
+# a)
+```{r}
+my_url = "http://ritsokiguess.site/STAC33/zz.csv"
+estimate <- read_csv(my_url)
+estimate
+```
+
+# b)
+Since the data has 100 sample on variable z, then df = 100 - 1 = 99
+```{r}
+n <- length(estimate$z)
+ba <- qchisq(c(0.975, 0.025), df = n - 1)
+ba
+```
+a = 73.36108, b = 128.42199
+
+# c)
+```{r}
+#estimate %>% mutate(m = mean(z)) -> est
+#m <- est$m
+#ssq2 <- sum((estimate$z - m)^2)/(n - 1)
+#ssq2
+# the above was manually calculating sample variance
+ssq <- var(estimate$z)
+sigmasq <- ((n-1)*ssq)/ba
+sigmasq
+```
+
+# d)
+```{r}
+estimate %>% ggplot(aes(x = z)) + geom_histogram(bins = 10)
+```
+
+# e)
+Based on the plot, the 95% CI seems to be at around (5, 15) however in c) it's (9.888232, 17.309811) indicating that the interval is very narrow which is doubtable.
+
+# f)
+```{r}
+rerun(1000, sample(estimate$z, replace = T)) %>% 
+  map_dbl(~ var(.)) -> vars
+b_CI <- quantile(vars, c(0.025, 0.975))
+b_CI
+```
+
+# g)
+```{r}
+tibble(sigmasq, b_CI)
+```
+
+(7.492841, 19.480912) vs (9.888232, 17.309811), I would prefer the bootstrap CI. The data is simulated 1000 times such that the sampling distribution of the sample variance is approximately normal giving a large sample size. Bootstrap is the way of looking at variations of repeated samples. The bootstrap interval is wider therefore bootstrap interval is the one that's more reliable.
